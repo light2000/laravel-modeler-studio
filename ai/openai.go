@@ -1,0 +1,91 @@
+package ai
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
+	"github.com/light2000/laravel-modeler-studio/logger"
+	"github.com/light2000/laravel-modeler-studio/proto"
+)
+
+// OpenAITableAISuggestAttrs 调用 OpenAI [对话补全]（JSON 模式），解析为表字段推荐结果。
+// apiKey 为空则返回错误。
+func OpenAITableAISuggestAttrs(openaiChatCompletionsURL string, openaiModelChat string, apiKey string, project *proto.Project, request *SuggestAttrsAIRequest) (*TableAISuggestAttrsData, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, fmt.Errorf("openai: 缺少 API Key")
+	}
+	messages, err := TableAISuggestAttrsPrompt(project, request)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(OpenAICompletionRequest{
+		Model:    openaiModelChat,
+		Messages: messages,
+	})
+
+	if err != nil {
+		logger.Errorf("openai: 序列化请求: %v", err)
+		return nil, fmt.Errorf("openai: 序列化请求: %w", err)
+	}
+	logger.Infof("openai: 调用 OpenAI 表字段推荐: %s", string(body))
+
+	req, err := http.NewRequest(http.MethodPost, openaiChatCompletionsURL, bytes.NewReader(body))
+	if err != nil {
+		logger.Errorf("openai: 构造请求: %v", err)
+		return nil, fmt.Errorf("openai: 构造请求: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(apiKey))
+
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		logger.Errorf("openai: 请求失败: %v", err)
+		return nil, fmt.Errorf("openai: 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Errorf("openai: 读取响应: %v", err)
+		return nil, fmt.Errorf("openai: 读取响应: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Errorf("openai: HTTP %s: %s", resp.Status, truncateForErr(raw, 512))
+		return nil, fmt.Errorf("openai: HTTP %s: %s", resp.Status, truncateForErr(raw, 512))
+	}
+
+	var apiResp chatCompletionResponse
+	if err := json.Unmarshal(raw, &apiResp); err != nil {
+		logger.Errorf("openai: 解析响应 JSON: %v", err)
+		return nil, fmt.Errorf("openai: 解析响应 JSON: %w", err)
+	}
+	if len(apiResp.Choices) == 0 {
+		logger.Errorf("openai: 响应缺少 choices")
+		return nil, fmt.Errorf("openai: 响应缺少 choices")
+	}
+	if apiResp.Choices[0].FinishReason == "length" {
+		logger.Errorf("openai: 输出因长度被截断 (finish_reason=length)")
+		return nil, fmt.Errorf("openai: 输出因长度被截断 (finish_reason=length)")
+	}
+
+	content := strings.TrimSpace(apiResp.Choices[0].Message.Content)
+	if content == "" {
+		logger.Errorf("openai: 模型返回空 content")
+		return nil, fmt.Errorf("openai: 模型返回空 content")
+	}
+
+	content = extractJSONObject(content)
+	logger.Infof("openai: 表字段推荐结果: %s", content)
+	var data TableAISuggestAttrsData
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		logger.Errorf("openai: 解析业务 JSON: %v", err)
+		return nil, fmt.Errorf("openai: 解析业务 JSON: %w", err)
+	}
+
+	return &data, nil
+}
