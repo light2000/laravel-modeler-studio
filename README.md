@@ -147,13 +147,13 @@ PRO 版本额外提供：
 
 # 安全性
 
-Studio 完全本地运行， GOLANG部分完全开源，只在配置翻译/AI功能的时候请求相关三方服务接口。
+Studio 完全本地运行，只在配置翻译/AI功能的时候请求相关三方服务接口。
 
 ---
 
 # License
 
-`modeler-studio` WEB画布部分采用商业授权分发。
+MIT
 
 ## Links
 
