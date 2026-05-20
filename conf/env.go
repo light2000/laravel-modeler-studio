@@ -80,4 +80,7 @@ func InitFeatureStatus() {
 		LLM:   Config.LLMAPIKey != "",
 		SN:    Config.ProSN,
 	}
+	fmt.Println("Use LLM: ", Feature.LLM)
+	fmt.Println("Use Trans: ", Feature.Trans)
+	fmt.Println("Use SN: ", Feature.SN)
 }
