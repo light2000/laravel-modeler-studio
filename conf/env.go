@@ -82,5 +82,5 @@ func InitFeatureStatus() {
 	}
 	fmt.Println("Use LLM: ", Feature.LLM)
 	fmt.Println("Use Trans: ", Feature.Trans)
-	fmt.Println("Use SN: ", Feature.SN)
+	fmt.Println("Use SN: ", Feature.SN != "")
 }

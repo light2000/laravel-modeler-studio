@@ -85,7 +85,7 @@ func main() {
 	}
 
 	if err := conf.LoadConfig(configPath); err != nil {
-		log.Fatalf("读取JSON配置失败: %v", err)
+		log.Fatalf("读取-config=%s JSON配置失败: %v", configPath, err)
 	}
 
 	conf.InitFeatureStatus()
